@@ -33,8 +33,8 @@ echo "== resources"
   --version-code "$VCODE" --version-name "$VNAME"
 
 echo "== java"
-javac -encoding UTF-8 -source 8 -target 8 -Xlint:-options \
-  -bootclasspath "$JAR" -classpath "$JAR" -d "$OUT/classes" \
+javac -encoding UTF-8 --release 8 -Xlint:-options \
+  -classpath "$JAR" -d "$OUT/classes" \
   $(find src "$OUT/gen" -name '*.java')
 
 echo "== dex"
