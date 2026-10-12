@@ -1,0 +1,64 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - index.html
+      - android/**
+      - .github/workflows/android.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apk
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Android SDK packages
+        run: |
+          SM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SM" --licenses > /dev/null || true
+          "$SM" --install "platforms;android-35" "build-tools;35.0.0" > /dev/null
+
+      - name: Build APK
+        env:
+          VERSION_CODE: ${{ github.run_number }}
+          KS_PASS: engshorts
+        run: |
+          bash android/build.sh 2>&1 | tee build.log
+          exit ${PIPESTATUS[0]}
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v1.0.${{ github.run_number }}"
+          gh release create "$TAG" android/build/EngShorts.apk \
+            --title "Eng Shorts 1.0.${{ github.run_number }}" \
+            --notes "휴대폰에서 EngShorts.apk 를 눌러 받은 뒤 설치하세요." \
+            --latest
+          gh release delete build-log --yes --cleanup-tag 2>/dev/null || true
+
+      - name: Save build log on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          touch build.log
+          gh release delete build-log --yes --cleanup-tag 2>/dev/null || true
+          gh release create build-log build.log --prerelease \
+            --title "Build log (failed run ${{ github.run_number }})" \
+            --notes "Build failed. See build.log."
